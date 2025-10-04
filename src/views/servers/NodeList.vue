@@ -1,0 +1,267 @@
+﻿<template>
+  <div class="nodes-container">
+    <!-- 域名授权验证提示 - 如果不需要域名授权功能，移除此组件即可 -->
+
+    <div class="nodes-inner">
+      <!-- 欢迎卡片 -->
+      <WelcomeCard
+        :current-view="currentView"
+        @switch-view="handleSwitchView"
+      />
+
+      <!-- 节点列表状态 -->
+      <div v-if="loading" class="nodes-loading">
+        <LoadingSpinner />
+        <p>正在加载节点...</p>
+      </div>
+
+      <!-- 错误提示 -->
+      <div v-else-if="error" class="nodes-error">
+        <IconAlertTriangle :size="48" class="error-icon" />
+        <p>{{ error }}</p>
+        <button class="retry-button" @click="fetchNodes">重试</button>
+      </div>
+
+      <!-- 节点列表内容 -->
+      <template v-else-if="nodes && nodes.length > 0">
+        <!-- 列表视图 -->
+        <NodeList
+          v-if="currentView === 'list'"
+          :nodes="nodes"
+          :show-node-details="showNodeDetails"
+          :show-node-rate="showNodeRate"
+          :allow-view-node-info="allowViewNodeInfo"
+          @show-detail="openNodeDetail"
+        />
+
+        <!-- 地图视图 -->
+        <MapView v-if="currentView === 'map'" :nodes="nodes" @show-detail="openNodeDetail" />
+      </template>
+
+      <!-- 空状态 -->
+      <div v-else class="nodes-empty">
+        <IconServer :size="48" class="empty-icon" />
+        <p>暂无可用节点</p>
+      </div>
+    </div>
+
+    <!-- 节点详情模态框 -->
+    <NodeDetailModal
+      v-if="allowViewNodeInfo"
+      :show="showDetailModal"
+      :node="selectedNode"
+      :userInfo="userInfo"
+      @close="closeNodeDetail"
+    />
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, inject } from 'vue';
+import LoadingSpinner from '@/components/common/LoadingSpinner.vue';
+import {
+  IconAlertTriangle,
+  IconServer
+} from '@tabler/icons-vue';
+import { fetchServerNodes } from '@/api/servers';
+import { getUserInfo } from '@/api/user';
+
+import { NODES_CONFIG } from '@/utils/baseConfig';
+import NodeDetailModal from '@/components/common/NodeDetailModal.vue';
+
+// 子组件
+import WelcomeCard from './components/WelcomeCard.vue';
+import NodeList from './components/NodeList.vue';
+import MapView from './components/MapView.vue';
+
+const $toast = inject('$toast');
+
+// 响应式数据
+const loading = ref(true);
+const error = ref('');
+const nodes = ref([]);
+const showNodeDetails = ref(NODES_CONFIG.showNodeDetails);
+const showNodeRate = ref(NODES_CONFIG.showNodeRate);
+const allowViewNodeInfo = ref(NODES_CONFIG.allowViewNodeInfo);
+
+// 用户信息
+const userInfo = ref(null);
+
+// 视图模式：'list' 或 'map'
+const currentView = ref('list');
+
+// 模态框相关
+const showDetailModal = ref(false);
+const selectedNode = ref(null);
+
+// 处理视图切换
+const handleSwitchView = (view) => {
+  currentView.value = view;
+};
+
+// 打开节点详情
+const openNodeDetail = (node) => {
+  selectedNode.value = node;
+  showDetailModal.value = true;
+};
+
+// 关闭节点详情
+const closeNodeDetail = () => {
+  showDetailModal.value = false;
+  setTimeout(() => {
+    selectedNode.value = null;
+  }, 300);
+};
+
+// 获取用户信息
+const fetchUserInfo = async () => {
+  try {
+    const result = await getUserInfo();
+    if (result && result.data) {
+      userInfo.value = result.data;
+    }
+  } catch (err) {
+    console.error('Failed to fetch user info:', err);
+    if ($toast) {
+      $toast.error('获取用户信息失败');
+    }
+  }
+};
+
+// 获取节点列表
+const fetchNodes = async () => {
+  loading.value = true;
+  error.value = '';
+
+  try {
+    const result = await fetchServerNodes();
+
+    if (result && result.data) {
+      nodes.value = result.data;
+    } else {
+      nodes.value = [];
+    }
+  } catch (err) {
+    console.error('Failed to fetch nodes:', err);
+    error.value = err.response?.message || (err && err.message ? err.message : '网络错误');
+
+    if ($toast) {
+      $toast.error(error.value);
+    }
+  } finally {
+    loading.value = false;
+  }
+};
+
+onMounted(() => {
+  fetchUserInfo();
+  fetchNodes();
+});
+</script>
+
+<style lang="scss" scoped>
+.nodes-container {
+  padding: 1.25rem;
+  padding-bottom: calc(1.25rem + 64px);
+
+  @media (min-width: 768px) {
+    padding: 2rem;
+    padding-bottom: 3rem;
+  }
+}
+
+.nodes-inner {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.nodes-content {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.nodes-loading,
+.nodes-error,
+.nodes-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1rem;
+  text-align: center;
+
+  p {
+    margin-top: 1rem;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+  }
+
+  .error-icon,
+  .empty-icon {
+    color: var(--text-muted);
+    opacity: 0.7;
+  }
+}
+
+.retry-button {
+  margin-top: 1.5rem;
+  height: 40px;
+  min-width: 120px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: 8px;
+  background-color: rgba(var(--theme-color-rgb), 0.85);
+  color: white;
+  font-weight: 500;
+  font-size: 14px;
+  border: 1px solid rgba(var(--theme-color-rgb), 0.3);
+  box-shadow: 0 8px 20px rgba(var(--theme-color-rgb), 0.25);
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 25px rgba(var(--theme-color-rgb), 0.35);
+    background-color: rgba(var(--theme-color-rgb), 0.95);
+  }
+
+  &:active {
+    transform: translateY(0);
+    box-shadow: 0 5px 15px rgba(var(--theme-color-rgb), 0.3);
+  }
+}
+
+// 移动端优化
+@media (max-width: 768px) {
+  .nodes-container {
+    padding: 1rem;
+    padding-bottom: calc(1rem + 64px);
+  }
+
+  .nodes-loading,
+  .nodes-error,
+  .nodes-empty {
+    padding: 2rem 1rem;
+
+    p {
+      font-size: 1rem;
+    }
+  }
+
+  .retry-button {
+    height: 36px;
+    min-width: 100px;
+    padding: 0 12px;
+    font-size: 13px;
+  }
+}
+</style>
