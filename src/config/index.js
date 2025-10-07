@@ -540,7 +540,7 @@ export const config  = {
         type: 'crisp',
 
         // 客服系统JS代码，请将您的客服系统提供的嵌入代码粘贴在这里
-        customHtml: 'CRISP_WEBSITE_ID="d36051b6-b9ca-4f43-8641-ce95cd860926"',
+        customHtml: 'CRISP_WEBSITE_ID="xxxxxx-xxxxxx-xxxxxx-xxxxxx-xxxxxx"',
 
         // 客服系统嵌入模式: 'popup'=弹出式页面, 'embed'=嵌入到每个页面
         // 'popup'模式: 点击客服图标会跳转到单独的客服页面
