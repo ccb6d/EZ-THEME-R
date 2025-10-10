@@ -49,14 +49,47 @@ module.exports = defineConfig({
         apply: (compiler) => {
           compiler.hooks.afterEmit.tap("GenerateExtraConfigPlugin", () => {
             const configPath = path.resolve(__dirname, "src/config/index.js");
+            const constantPath = path.resolve(__dirname, "src/config/constant.js");
             const distPath = path.resolve(compiler.options.output.path, extraScriptFileName);
             
             try {
-              let content = fs.readFileSync(configPath, "utf-8");
-              content = content.replace(/window\.EZ_CONFIG\s*=\s*config\s*;?/g, "");
-              content = content.replace(/export\s+const\s+config\s*=/, "window.EZ_CONFIG =");
+              let configContent = fs.readFileSync(configPath, "utf-8");
+              let constantContent = fs.readFileSync(constantPath, "utf-8");
               
-              const obfuscated = JavaScriptObfuscator.obfuscate(content, {
+              // 从 config/index.js 中提取导入的函数名
+              const importMatch = configContent.match(/import\s+{([^}]+)}\s+from\s+["']@\/config\/constant["']/);
+              if (importMatch) {
+                const importedFunctions = importMatch[1].split(',').map(f => f.trim());
+                
+                // 为每个导入的函数创建定义
+                let functionsCode = '';
+                
+                for (const funcName of importedFunctions) {
+                  // 在 constantContent 中查找函数定义
+                  const funcRegex = new RegExp(`export\\s+const\\s+${funcName}\\s*=\\s*([\\s\\S]*?)(?=\\n\\s*export\\s+const|\\n\\s*$|$)`, 'g');
+                  const funcMatch = funcRegex.exec(constantContent);
+                  
+                  if (funcMatch) {
+                    let funcBody = funcMatch[1].trim();
+                    // 确保函数体以分号结尾
+                    if (!funcBody.endsWith(';')) {
+                      funcBody += ';';
+                    }
+                    
+                    // 添加函数定义
+                    functionsCode += `const ${funcName} = ${funcBody}\n`;
+                  }
+                }
+                
+                // 替换 import 语句为函数定义
+                configContent = configContent.replace(/import\s+{[^}]+}\s+from\s+["']@\/config\/constant["'];?\s*\n?/, functionsCode);
+              }
+              
+              // 原有的替换 export 语句的逻辑
+              configContent = configContent.replace(/window\.EZ_CONFIG\s*=\s*config\s*;?/g, "");
+              configContent = configContent.replace(/export\s+const\s+config\s*=/, "window.EZ_CONFIG =");
+              
+              const obfuscated = JavaScriptObfuscator.obfuscate(configContent, {
                 compact: true,
                 controlFlowFlattening: true,
                 controlFlowFlatteningThreshold: 0.75,
@@ -69,7 +102,7 @@ module.exports = defineConfig({
                 unicodeEscapeSequence: true
               }).getObfuscatedCode();
               
-              const fileContent = enableObfuscation ? obfuscated : content;
+              const fileContent = enableObfuscation ? obfuscated : configContent;
               
               // 写入 dist
               fs.writeFileSync(distPath, fileContent, "utf-8");
