@@ -1734,7 +1734,7 @@ export default {
         },
         xAxis: {
           type: 'category',
-          boundaryGap: false,
+          boundaryGap: true,
           data: dates,
           axisLabel: {
             rotate: 45,
@@ -1777,37 +1777,36 @@ export default {
         series: [
           {
             name: t('trafficLog.uploadTraffic'),
-            type: 'line',
+            type: 'bar',
             stack: 'Total',
-            smooth: true,
-            lineStyle: { width: 2 },
-            showSymbol: false,
-            areaStyle: { opacity: 0.2 },
+            barWidth: '60%',
             emphasis: { focus: 'series' },
             data: uploadData,
-            color: '#36AD47'
+            color: '#36AD47',
+            itemStyle: {
+              borderRadius: [0, 0, 0, 0]
+            }
           },
           {
             name: t('trafficLog.downloadTraffic'),
-            type: 'line',
+            type: 'bar',
             stack: 'Total',
-            smooth: true,
-            lineStyle: { width: 2 },
-            showSymbol: false,
-            areaStyle: { opacity: 0.2 },
             emphasis: { focus: 'series' },
             data: downloadData,
-            color: '#4080FF'
+            color: '#4080FF',
+            itemStyle: {
+              borderRadius: [0, 0, 0, 0]
+            }
           },
           {
             name: t('trafficLog.totalTraffic'),
-            type: 'line',
-            smooth: true,
-            lineStyle: { width: 3 },
-            showSymbol: false,
+            type: 'bar',
             emphasis: { focus: 'series' },
             data: totalData,
-            color: themeColor
+            color: themeColor,
+            itemStyle: {
+              borderRadius: [4, 4, 0, 0]
+            }
           }
         ]
       };
