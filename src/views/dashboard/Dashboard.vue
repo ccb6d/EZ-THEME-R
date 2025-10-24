@@ -427,19 +427,26 @@
         </template>
 
         <template v-else>
-          <div class="stats-card"
+          <div class="stats-card traffic-clickable"
                :class="{
               'card-animate': !loading.userStats,
               'warning-card': isLowTraffic && !isTrafficDepleted,
-              'danger-card': isTrafficDepleted
+              'danger-card': isTrafficDepleted,
+              'chart-active': showTrafficChart
             }"
-               style="animation-delay: 0.5s">
+               style="animation-delay: 0.5s"
+               @click="toggleTrafficChart">
             <div class="stats-icon">
               <IconTransferVertical :size="32"/>
             </div>
             <div class="stats-info">
               <div class="stats-value">{{ userStats.remainingTraffic }}</div>
               <div class="stats-label">{{ $t('dashboard.remainingTraffic') }}</div>
+            </div>
+
+            <!-- 展开指示图标 -->
+            <div class="expand-icon">
+              <IconChevronDown :size="20" :class="{ 'rotated': showTrafficChart }" />
             </div>
 
             <!-- 水流进度条效果 -->
@@ -506,6 +513,43 @@
           </div>
         </template>
       </div>
+
+      <!-- 流量趋势图卡片 -->
+      <transition name="slide-fade">
+        <div v-if="showTrafficChart" class="dashboard-card traffic-chart-card">
+          <div class="card-header">
+            <h2 class="card-title">{{ $t('trafficLog.trafficChart') }}</h2>
+            <button class="close-btn" @click.stop="showTrafficChart = false">
+              <span class="close-icon"></span>
+            </button>
+          </div>
+          <div class="card-body">
+            <!-- 加载状态 -->
+            <div v-if="trafficLoading" class="loading-container">
+              <div class="loading-spinner"></div>
+              <p>{{ $t('trafficLog.loadingTraffic') }}</p>
+            </div>
+            
+            <!-- 加载错误 -->
+            <div v-else-if="trafficError" class="error-container">
+              <IconAlertTriangle :size="48" class="error-icon" />
+              <p>{{ $t('trafficLog.errorLoadingTraffic') }}</p>
+              <button class="retry-button" @click.stop="fetchTrafficChartData">
+                {{ $t('common.retry') }}
+              </button>
+            </div>
+            
+            <!-- 数据为空 -->
+            <div v-else-if="!trafficData.length" class="empty-container">
+              <IconFileOff :size="48" class="empty-icon" />
+              <p>{{ $t('trafficLog.noTrafficData') }}</p>
+            </div>
+            
+            <!-- 流量图表 -->
+            <div v-else ref="trafficChartRef" class="traffic-chart"></div>
+          </div>
+        </div>
+      </transition>
 
       <!-- 官方客户端下载区域 -->
       <div class="dashboard-card download-card" :class="{'card-animate': !loading.userInfo}"
@@ -636,7 +680,7 @@ import {
 } from 'vue';
 import {useRouter} from 'vue-router';
 import {useI18n} from 'vue-i18n';
-import {CLIENT_CONFIG, DASHBOARD_CONFIG, isXiaoV2board, SITE_CONFIG} from '@/utils/baseConfig';
+import {CLIENT_CONFIG, DASHBOARD_CONFIG, isXiaoV2board, SITE_CONFIG, TRAFFICLOG_CONFIG} from '@/utils/baseConfig';
 import {
   IconAlertTriangle,
   IconBox,
@@ -650,10 +694,12 @@ import {
   IconCat,
   IconChevronLeft,
   IconChevronRight,
+  IconChevronDown,
   IconCoins,
   IconCopy,
   IconCrosshair,
   IconDeviceDesktop,
+  IconFileOff,
   IconFileText,
   IconHelpCircle,
   IconMail,
@@ -707,8 +753,10 @@ import stashMacIconImg from '@/assets/images/client-img-macos/stash.png';
 import quantumultXMacIconImg from '@/assets/images/client-img-macos/quantumultx.png';
 import singboxMacIconImg from '@/assets/images/client-img-macos/singbox.png';
 import hiddifyMacIconImg from '@/assets/images/client-img-macos/hiddify.png';
-import {cleanupResources, createTimer} from '@/utils/componentLifecycle';
+import {cleanupResources, createTimer, createDebouncedUpdate} from '@/utils/componentLifecycle';
 import CheckIn from './components/CheckIn.vue'
+import * as echarts from 'echarts';
+import {getTrafficLog} from '@/api/trafficLog';
 
 const md = new MarkdownIt({
   html: true,
@@ -785,6 +833,8 @@ export default {
     IconRefresh,
     IconAlertTriangle,
     IconCalendarPlus,
+    IconChevronDown,
+    IconFileOff,
     CommonDialog,
     CheckIn,
   },
@@ -851,10 +901,19 @@ export default {
     const {showToast} = useToast();
     const qrCodeUrl = ref('');
 
-    //提前开启下月
-    const allowNewPeriod = ref('')
+      //提前开启下月
+      const allowNewPeriod = ref('')
 
-    const platforms = [
+      // 流量图表相关状态
+      const showTrafficChart = ref(false);
+      const trafficData = ref([]);
+      const trafficLoading = ref(false);
+      const trafficError = ref(false);
+      const trafficChartRef = ref(null);
+      let trafficChartInstance = null;
+      const showOriginalTrafficData = ref(false);
+
+      const platforms = [
       {id: 'ios', icon: 'IconBrandApple'},
       {id: 'android', icon: 'IconBrandAndroid'},
       {id: 'windows', icon: 'IconBrandWindows'},
@@ -1564,6 +1623,230 @@ export default {
       }
     };
 
+    // 流量图表相关函数
+    const fetchTrafficChartData = async () => {
+      if (trafficData.value.length > 0) return; // 已有数据则不重复获取
+      
+      trafficLoading.value = true;
+      trafficError.value = false;
+      
+      try {
+        const response = await getTrafficLog();
+        if (response && response.data) {
+          trafficData.value = response.data.sort((a, b) => b.record_at - a.record_at);
+          
+          if (TRAFFICLOG_CONFIG.daysToShow > 0) {
+            const uniqueDates = [...new Set(trafficData.value.map(item => {
+              const date = new Date(item.record_at * 1000);
+              return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+            }))];
+            
+            if (uniqueDates.length > TRAFFICLOG_CONFIG.daysToShow) {
+              const datesToKeep = uniqueDates.slice(0, TRAFFICLOG_CONFIG.daysToShow);
+              trafficData.value = trafficData.value.filter(item => {
+                const date = new Date(item.record_at * 1000);
+                const dateStr = `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+                return datesToKeep.includes(dateStr);
+              });
+            }
+          }
+        } else {
+          trafficData.value = [];
+        }
+      } catch (err) {
+        console.error('获取流量数据失败:', err);
+        trafficError.value = true;
+      } finally {
+        trafficLoading.value = false;
+      }
+    };
+
+    const initTrafficChart = () => {
+      if (trafficChartInstance) {
+        trafficChartInstance.dispose();
+      }
+      
+      if (!trafficChartRef.value || trafficData.value.length === 0) return;
+      
+      trafficChartInstance = echarts.init(trafficChartRef.value);
+      
+      const themeColor = getComputedStyle(document.documentElement).getPropertyValue('--theme-color').trim() || '#355cc2';
+      
+      const dates = [];
+      const uploadData = [];
+      const downloadData = [];
+      const totalData = [];
+      
+      let sortedData;
+      if (TRAFFICLOG_CONFIG.sumDailyTraffic) {
+        const dailyTraffic = {};
+        trafficData.value.forEach(item => {
+          const recordDate = item.record_at;
+          if (!dailyTraffic[recordDate]) {
+            dailyTraffic[recordDate] = { record_at: recordDate, u: 0, d: 0 };
+          }
+          if (showOriginalTrafficData.value) {
+            dailyTraffic[recordDate].u += item.u;
+            dailyTraffic[recordDate].d += item.d;
+          } else {
+            dailyTraffic[recordDate].u += item.u * parseFloat(item.server_rate);
+            dailyTraffic[recordDate].d += item.d * parseFloat(item.server_rate);
+          }
+        });
+        sortedData = Object.values(dailyTraffic).slice(0, 30);
+      } else {
+        sortedData = [...trafficData.value].slice(0, 30).reverse();
+      }
+      
+      sortedData.forEach(item => {
+        dates.push(formatDate(item.record_at));
+        const upload = parseFloat((item.u / (1024 * 1024 * 1024)).toFixed(2));
+        const download = parseFloat((item.d / (1024 * 1024 * 1024)).toFixed(2));
+        uploadData.push(upload);
+        downloadData.push(download);
+        totalData.push(parseFloat((upload + download).toFixed(2)));
+      });
+      
+      const option = {
+        tooltip: {
+          trigger: 'axis',
+          formatter: function (params) {
+            let result = params[0].name + '<br/>';
+            params.forEach(param => {
+              result += param.marker + ' ' + param.seriesName + ': ' + param.value + ' GB<br/>';
+            });
+            return result;
+          }
+        },
+        legend: {
+          data: [t('trafficLog.uploadTraffic'), t('trafficLog.downloadTraffic'), t('trafficLog.totalTraffic')],
+          bottom: 0,
+          textStyle: {
+            color: getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim() || '#333333'
+          }
+        },
+        grid: {
+          left: '3%',
+          right: '4%',
+          bottom: '60px',
+          top: '30px',
+          containLabel: true
+        },
+        xAxis: {
+          type: 'category',
+          boundaryGap: false,
+          data: dates,
+          axisLabel: {
+            rotate: 45,
+            interval: 'auto',
+            color: getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim() || '#333333'
+          },
+          axisLine: {
+            lineStyle: {
+              color: getComputedStyle(document.documentElement).getPropertyValue('--border-color').trim() || '#e8e8e8'
+            }
+          },
+          splitLine: {
+            lineStyle: {
+              color: getComputedStyle(document.documentElement).getPropertyValue('--border-color').trim() || '#e8e8e8'
+            }
+          }
+        },
+        yAxis: {
+          type: 'value',
+          name: 'GB',
+          nameTextStyle: {
+            padding: [0, 0, 0, 10],
+            color: getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim() || '#333333'
+          },
+          axisLabel: {
+            formatter: '{value} GB',
+            color: getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim() || '#333333'
+          },
+          axisLine: {
+            lineStyle: {
+              color: getComputedStyle(document.documentElement).getPropertyValue('--border-color').trim() || '#e8e8e8'
+            }
+          },
+          splitLine: {
+            lineStyle: {
+              color: getComputedStyle(document.documentElement).getPropertyValue('--border-color').trim() || '#e8e8e8'
+            }
+          }
+        },
+        series: [
+          {
+            name: t('trafficLog.uploadTraffic'),
+            type: 'line',
+            stack: 'Total',
+            smooth: true,
+            lineStyle: { width: 2 },
+            showSymbol: false,
+            areaStyle: { opacity: 0.2 },
+            emphasis: { focus: 'series' },
+            data: uploadData,
+            color: '#36AD47'
+          },
+          {
+            name: t('trafficLog.downloadTraffic'),
+            type: 'line',
+            stack: 'Total',
+            smooth: true,
+            lineStyle: { width: 2 },
+            showSymbol: false,
+            areaStyle: { opacity: 0.2 },
+            emphasis: { focus: 'series' },
+            data: downloadData,
+            color: '#4080FF'
+          },
+          {
+            name: t('trafficLog.totalTraffic'),
+            type: 'line',
+            smooth: true,
+            lineStyle: { width: 3 },
+            showSymbol: false,
+            emphasis: { focus: 'series' },
+            data: totalData,
+            color: themeColor
+          }
+        ]
+      };
+      
+      trafficChartInstance.setOption(option);
+      
+      const handleTrafficChartResize = () => {
+        if (trafficChartInstance) {
+          trafficChartInstance.resize();
+        }
+      };
+      window.addEventListener('resize', handleTrafficChartResize);
+    };
+
+    const toggleTrafficChart = () => {
+      showTrafficChart.value = !showTrafficChart.value;
+      if (showTrafficChart.value) {
+        fetchTrafficChartData().then(() => {
+          nextTick(() => {
+            initTrafficChart();
+            setTimeout(() => {
+              const chartCard = document.querySelector('.traffic-chart-card');
+              if (chartCard) {
+                chartCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+              }
+            }, 100);
+          });
+        });
+      }
+    };
+
+    watch(() => trafficData.value, () => {
+      if (!trafficLoading.value && !trafficError.value && trafficData.value.length > 0 && showTrafficChart.value) {
+        nextTick(() => {
+          initTrafficChart();
+        });
+      }
+    }, { deep: true });
+
     const fetchUserConfig = async () => {
       try {
         const response = await getUserConfig();
@@ -1658,6 +1941,11 @@ export default {
 
     onUnmounted(() => {
       cleanupResources(timers, listeners);
+      // 清理流量图表
+      if (trafficChartInstance) {
+        trafficChartInstance.dispose();
+        trafficChartInstance = null;
+      }
     });
 
     const needRefreshData = ref(false);
@@ -1777,6 +2065,13 @@ export default {
       allowNewPeriod,
       showImportSubscription,
       isMobile,
+      showTrafficChart,
+      trafficData,
+      trafficLoading,
+      trafficError,
+      trafficChartRef,
+      toggleTrafficChart,
+      fetchTrafficChartData,
     };
   }
 };
@@ -2055,6 +2350,170 @@ export default {
         .chevron-icon {
           transform: translateX(3px);
           opacity: 1;
+        }
+      }
+
+      // 流量卡片可点击样式
+      &.traffic-clickable {
+        cursor: pointer;
+        position: relative;
+
+        .expand-icon {
+          position: absolute;
+          right: 15px;
+          top: 50%;
+          transform: translateY(-50%);
+          color: var(--theme-color);
+          opacity: 0.6;
+          transition: all 0.3s ease;
+          z-index: 2;
+
+          svg {
+            transition: transform 0.3s ease;
+
+            &.rotated {
+              transform: rotate(180deg);
+            }
+          }
+        }
+
+        &:hover {
+          transform: translateY(-2px);
+          border-color: rgba(var(--theme-color-rgb), 0.5);
+          box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+
+          .expand-icon {
+            opacity: 1;
+          }
+        }
+
+        &.chart-active {
+          border-color: rgba(var(--theme-color-rgb), 0.6);
+          box-shadow: 0 4px 15px rgba(var(--theme-color-rgb), 0.15);
+        }
+      }
+    }
+  }
+
+  // 流量图表卡片
+  .traffic-chart-card {
+    margin-bottom: 24px;
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+
+      .card-title {
+        margin: 0;
+      }
+
+      .close-btn {
+        width: 32px;
+        height: 32px;
+        border-radius: 8px;
+        border: none;
+        background-color: rgba(var(--theme-color-rgb), 0.1);
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s ease;
+        padding: 0;
+
+        .close-icon {
+          position: relative;
+          width: 16px;
+          height: 16px;
+
+          &::before,
+          &::after {
+            content: '';
+            position: absolute;
+            width: 100%;
+            height: 2px;
+            background-color: var(--theme-color);
+            top: 50%;
+            left: 0;
+            transform-origin: center;
+          }
+
+          &::before {
+            transform: translateY(-50%) rotate(45deg);
+          }
+
+          &::after {
+            transform: translateY(-50%) rotate(-45deg);
+          }
+        }
+
+        &:hover {
+          background-color: rgba(var(--theme-color-rgb), 0.2);
+          transform: scale(1.05);
+        }
+
+        &:active {
+          transform: scale(0.95);
+        }
+      }
+    }
+
+    .card-body {
+      min-height: 400px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+
+      .traffic-chart {
+        width: 100%;
+        height: 400px;
+      }
+
+      .loading-container,
+      .error-container,
+      .empty-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        color: var(--secondary-text-color);
+
+        .loading-spinner {
+          width: 48px;
+          height: 48px;
+          border: 4px solid rgba(var(--theme-color-rgb), 0.1);
+          border-top-color: var(--theme-color);
+          border-radius: 50%;
+          animation: spin 1s linear infinite;
+        }
+
+        .error-icon,
+        .empty-icon {
+          color: var(--secondary-text-color);
+          opacity: 0.5;
+        }
+
+        p {
+          margin: 0;
+          font-size: 14px;
+        }
+
+        .retry-button {
+          padding: 8px 16px;
+          border: 1px solid var(--theme-color);
+          background-color: transparent;
+          color: var(--theme-color);
+          border-radius: 6px;
+          cursor: pointer;
+          font-size: 14px;
+          transition: all 0.3s ease;
+
+          &:hover {
+            background-color: var(--theme-color);
+            color: white;
+          }
         }
       }
     }
@@ -3441,6 +3900,36 @@ export default {
 .popup-slide-leave-to {
   opacity: 0;
   transform: scale(0.95);
+}
+
+// 流量图表卡片的过渡动画
+.slide-fade-enter-active,
+.slide-fade-leave-active {
+  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+.slide-fade-enter-from {
+  opacity: 0;
+  transform: translateY(-20px);
+  max-height: 0;
+}
+
+.slide-fade-enter-to {
+  opacity: 1;
+  transform: translateY(0);
+  max-height: 600px;
+}
+
+.slide-fade-leave-from {
+  opacity: 1;
+  transform: translateY(0);
+  max-height: 600px;
+}
+
+.slide-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-20px);
+  max-height: 0;
 }
 
 
