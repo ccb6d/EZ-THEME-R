@@ -230,6 +230,7 @@ export default {
         selectPlatform: '选择您的设备平台',
         subscriptionCopied: '订阅链接已复制到剪贴板',
         copyFailed: '复制失败，请手动复制',
+        subscriptionValidityWarning: '⏰ 提醒：订阅链接有效时间为 60 秒',
         manualImportRequired: '无法自动导入，请手动复制订阅链接导入',
         noSubscription: '无可用订阅',
         noClientsAvailable: '该平台暂无可用快速导入方式',

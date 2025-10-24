@@ -227,6 +227,7 @@ export default {
     selectPlatform: '기기 플랫폼 선택',
     subscriptionCopied: '구독 링크가 클립보드에 복사되었습니다',
     copyFailed: '복사 실패, 수동으로 복사하세요',
+    subscriptionValidityWarning: '⏰ 알림: 구독 링크 유효 시간은 60초입니다',
     manualImportRequired: '자동 가져오기가 불가능합니다. 구독 링크를 수동으로 복사하여 가져오세요',
     noSubscription: '사용 가능한 구독 없음',
     noClientsAvailable: '이 플랫폼은 빠른 가져오기 방법을 지원하지 않습니다',

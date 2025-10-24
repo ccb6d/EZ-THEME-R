@@ -227,6 +227,7 @@ export default {
     selectPlatform: '選擇您的設備平台',
     subscriptionCopied: '訂閱連結已複製到剪貼簿',
     copyFailed: '複製失敗，請手動複製',
+    subscriptionValidityWarning: '⏰ 提醒：訂閱連結有效時間為 60 秒',
     manualImportRequired: '無法自動匯入，請手動複製訂閱連結匯入',
     noSubscription: '無可用訂閱',
     noClientsAvailable: '此平台暫無可用快速匯入方式',

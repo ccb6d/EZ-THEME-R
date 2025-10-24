@@ -227,6 +227,7 @@ export default {
     selectPlatform: 'デバイスプラットフォームを選択',
     subscriptionCopied: 'サブスクリプションリンクをクリップボードにコピー済み',
     copyFailed: 'コピー失敗。手動でコピーしてください',
+    subscriptionValidityWarning: '⏰ リマインダー：サブスクリプションリンクの有効期限は60秒です',
     manualImportRequired: '自動インポート不可。サブスクリプションリンクを手動でコピーしてインポートしてください',
     noSubscription: '利用可能なサブスクリプションなし',
     noClientsAvailable: 'このプラットフォームでは即時インポート方法がありません',

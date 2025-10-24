@@ -236,6 +236,7 @@ export default {
         selectPlatform: 'Chọn nền tảng thiết bị của bạn',
         subscriptionCopied: 'Liên kết đăng ký đã được sao chép vào clipboard',
         copyFailed: 'Sao chép thất bại, vui lòng sao chép thủ công',
+        subscriptionValidityWarning: '⏰ Nhắc nhở: Liên kết đăng ký có hiệu lực trong 60 giây',
         manualImportRequired: 'Không thể tự động nhập, vui lòng sao chép liên kết đăng ký thủ công để nhập',
         noSubscription: 'Không có đăng ký khả dụng',
         noClientsAvailable: 'Nền tảng này tạm thời không có cách nhập nhanh khả dụng',

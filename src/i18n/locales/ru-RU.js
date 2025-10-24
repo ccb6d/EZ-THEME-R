@@ -227,6 +227,7 @@ export default {
     selectPlatform: 'Выберите платформу устройства',
     subscriptionCopied: 'Ссылка подписки скопирована в буфер обмена',
     copyFailed: 'Ошибка копирования, скопируйте вручную',
+    subscriptionValidityWarning: '⏰ Напоминание: Ссылка действительна в течение 60 секунд',
     manualImportRequired: 'Автоматический импорт невозможен, скопируйте ссылку подписки вручную',
     noSubscription: 'Нет доступной подписки',
     noClientsAvailable: 'Для этой платформы нет быстрого импорта',

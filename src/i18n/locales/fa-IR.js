@@ -227,6 +227,7 @@ export default {
     selectPlatform: 'پلتفرم دستگاه را انتخاب کنید',
     subscriptionCopied: 'لینک اشتراک کپی شد',
     copyFailed: 'کپی شکست خورد، لطفا دستی کپی کنید',
+    subscriptionValidityWarning: '⏰ یادآوری: لینک اشتراک به مدت 60 ثانیه معتبر است',
     manualImportRequired: 'وارد کردن خودکار ممکن نیست، لینک را دستی کپی کنید',
     noSubscription: 'اشتراکی موجود نیست',
     noClientsAvailable: 'برای این پلتفرم روش سریع وارد کردن موجود نیست',

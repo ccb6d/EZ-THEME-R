@@ -1407,6 +1407,10 @@ export default {
           navigator.clipboard.writeText(userPlan.value.subscribeUrl)
               .then(() => {
                 showToast(t('dashboard.subscriptionCopied'), 'success', 3000);
+                // 延迟200ms后显示第二个提示框，确保它出现在第一个提示框下方
+                setTimeout(() => {
+                  showToast(t('dashboard.subscriptionValidityWarning'), 'warning', 6000);
+                }, 200);
               })
               .catch(() => {
                 showToast(t('dashboard.copyFailed'), 'error', 3000);
@@ -1430,6 +1434,10 @@ export default {
 
             if (successful) {
               showToast(t('dashboard.subscriptionCopied'), 'success', 3000);
+              // 延迟200ms后显示第二个提示框，确保它出现在第一个提示框下方
+              setTimeout(() => {
+                showToast(t('dashboard.subscriptionValidityWarning'), 'warning', 6000);
+              }, 200);
             } else {
               showToast(t('dashboard.copyFailed'), 'error', 3000);
             }

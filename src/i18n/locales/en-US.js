@@ -230,6 +230,7 @@ export default {
         selectPlatform: 'Select Your Device Platform',
         subscriptionCopied: 'Subscription link copied to clipboard',
         copyFailed: 'Copy failed, please copy manually',
+        subscriptionValidityWarning: '⏰ Reminder: Subscription link is valid for 60 seconds',
         manualImportRequired: 'Automatic import not possible, please manually copy the subscription link',
         noSubscription: 'No subscription available',
         noClientsAvailable: 'No quick import methods available for this platform',
