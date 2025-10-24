@@ -48,11 +48,13 @@ const socialLogin = async (type) => {
 
 <template>
   <div class="third-party-login">
-    <button type="submit" class="btn" @click="socialLogin('google')">
+    <button type="button" class="btn btn-social" @click="socialLogin('google')">
       <IconGoogle class="icon-social" />
+      <span class="btn-text">Google</span>
     </button>
-    <button type="submit" class="btn" @click="socialLogin('telegram')">
+    <button type="button" class="btn btn-social" @click="socialLogin('telegram')">
       <IconTelegram class="icon-social" />
+      <span class="btn-text">Telegram</span>
     </button>
   </div>
   <TelegramModal ref="telegramModalRef" :config="props.config" />
@@ -61,23 +63,96 @@ const socialLogin = async (type) => {
 <style scoped lang="scss">
 .third-party-login {
   width: 100%;
-  height: 44px;
   display: flex;
-  justify-content: center;
-  align-items: center;
+  flex-direction: column;
+  gap: 12px;
 
   .btn {
-    padding: 0;
-    margin: 0 16px 0;
-    transition: all 0.3s ease;
+    height: 45px;
+    border-radius: 8px;
+    transition: all 0.3s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 16px;
+    border: 1px solid var(--border-color, #e0e0e0);
+    background-color: var(--input-bg-color, #f9f9f9);
+    color: var(--primary-text-color);
+    font-weight: 500;
+    width: 100%;
 
     &:hover {
-      transform: translateY(-2px);
+      border-color: var(--theme-color);
+      background-color: var(--input-focus-bg-color, #fff);
+      transform: none;
+    }
+
+    &:active {
+      transform: translateY(1px);
     }
   }
 
   .icon-social {
-    display: block;
+    width: 20px;
+    height: 20px;
+    margin-right: 12px;
+    flex-shrink: 0;
+  }
+
+  .btn-text {
+    font-size: 0.95rem;
+    font-weight: 500;
+  }
+}
+
+// 移动端适配
+@media (max-width: 768px) {
+  .third-party-login {
+    .btn {
+      height: 50px; // 移动端增加按钮高度，便于点击
+      font-size: 16px; // 防止iOS缩放
+      
+      .btn-text {
+        font-size: 1rem; // 移动端文字稍大
+      }
+      
+      .icon-social {
+        width: 22px;
+        height: 22px;
+        margin-right: 10px;
+      }
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .third-party-login {
+    gap: 10px; // 小屏幕减少间距
+    
+    .btn {
+      height: 48px;
+      padding: 0 12px;
+      
+      .btn-text {
+        font-size: 0.95rem;
+      }
+    }
+  }
+}
+
+// 暗色主题适配
+.dark-theme {
+  .third-party-login {
+    .btn {
+      background-color: var(--input-bg-color, #333);
+      border-color: var(--input-border-color, #444);
+      color: var(--primary-text-color);
+
+      &:hover {
+        background-color: var(--input-focus-bg-color, #3a3a3a);
+        border-color: var(--theme-color);
+      }
+    }
   }
 }
 </style>

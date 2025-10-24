@@ -110,6 +110,12 @@
 
           <div class="auth-footer">
             <div class="auth-divider">
+              <span class="auth-divider-text">{{ $t('auth.thirdPartyLogin') }}</span>
+            </div>
+
+            <ThirdPartyLogin :config="configInfo" />
+
+            <div class="auth-divider">
               <span class="auth-divider-text">{{ $t('auth.noAccount') }}</span>
             </div>
 
@@ -139,7 +145,7 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted, computed } from 'vue';
+import { ref, reactive, onMounted, onBeforeUnmount, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useI18n } from 'vue-i18n';
 import { useToast } from '@/composables/useToast';
@@ -150,7 +156,7 @@ import IconLock from '@/components/icons/IconLock.vue';
 import IconArrowRight from '@/components/icons/IconArrowRight.vue';
 import IconEye from '@/components/icons/IconEye.vue';
 import IconEyeOff from '@/components/icons/IconEyeOff.vue';
-import { login, checkLoginStatus } from '@/api/auth';
+import { login, checkLoginStatus, getWebsiteConfig } from '@/api/auth';
 import { validateEmail, validateRequired } from '@/utils/validators';
 
 import DomainAuthAlert from '@/components/common/DomainAuthAlert.vue';
@@ -159,6 +165,7 @@ import { AUTH_LAYOUT_CONFIG, SITE_CONFIG, AUTH_CONFIG } from '@/utils/baseConfig
 import AuthPopup from '@/components/auth/AuthPopup.vue';
 import { shouldShowAuthPopup } from '@/utils/authPopupState';
 import { useNavigator } from "@/composables/useNavigator";
+import ThirdPartyLogin from '../components/ThirdPartyLogin.vue';
 
 export default {
   name: 'LoginView',
@@ -171,7 +178,8 @@ export default {
     IconEye,
     IconEyeOff,
     DomainAuthAlert,
-    AuthPopup
+    AuthPopup,
+    ThirdPartyLogin
   },
 
   setup() {
@@ -214,7 +222,35 @@ export default {
       showAuthPopup.value = false;
     };
 
+    const getConfig = async () => {
+      const res = await getWebsiteConfig();
+      configInfo.value = res.data;
+    };
+
+    // 监听来自验证窗口的消息
+    const handleMessage = (event) => {
+      console.log('收到消息:', event);
+      // 验证消息来源
+      if (event.origin !== window.location.origin) {
+        console.log('消息来源不匹配:', event.origin, window.location.origin);
+        return;
+      }
+
+      if (event.data && event.data.type === 'oauth_login_success') {
+        console.log('收到OAuth登录成功消息:', event.data);
+        const { token, is_admin, auth_data } = event.data.data;
+        if (token) {
+          localStorage.setItem('token', token)
+          localStorage.setItem('is_admin', is_admin)
+          localStorage.setItem('auth_data', auth_data)
+
+          window.location.reload();
+        }
+      }
+    };
+
     const showPassword = ref(false);
+    const configInfo = ref();
 
 
 
@@ -256,7 +292,10 @@ export default {
     });
 
     onMounted(async () => {
+      window.addEventListener('message', handleMessage);
 
+      // 获取站点配置
+      getConfig();
 
       const hasToken = hasVerifyToken();
 
@@ -316,6 +355,11 @@ export default {
       } catch (error) {
         console.error("登录状态检查失败", error);
       }
+    });
+
+    // 在组件卸载时移除事件监听器
+    onBeforeUnmount(() => {
+      window.removeEventListener('message', handleMessage);
     });
 
     const validateForm = () => {
@@ -400,6 +444,8 @@ export default {
       authPopupConfig,
       handleAuthPopupClose,
       goTo,
+      configInfo,
+      handleMessage,
     };
   }
 };
@@ -839,6 +885,29 @@ export default {
     text-decoration: none;
     height: 45px !important;
     line-height: normal !important;
+  }
+}
+
+// 移动端适配
+@media (max-width: 768px) {
+  .auth-footer {
+    margin-top: 20px;
+    
+    a.btn {
+      height: 50px !important; // 移动端增加按钮高度
+      font-size: 16px; // 防止iOS缩放
+    }
+  }
+}
+
+@media (max-width: 480px) {
+  .auth-footer {
+    margin-top: 16px;
+    
+    a.btn {
+      height: 48px !important;
+      padding: 0 12px;
+    }
   }
 }
 

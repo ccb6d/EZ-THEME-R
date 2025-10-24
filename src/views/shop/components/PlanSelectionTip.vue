@@ -3,12 +3,10 @@
     <div class="tip-content">
       <div class="tip-text-wrapper">
         <IconInfoCircle :size="20" class="tip-icon" />
-        <span class="tip-text">不知道怎么选套餐？</span>
+        <span class="tip-text">不知道如何使用？</span>
       </div>
       <a
-        href="https://google.com/combo/"
-        target="_blank"
-        rel="noopener noreferrer"
+        href="/#/docs"
         class="tip-link"
       >
         <IconExternalLink :size="16" class="link-icon" />
