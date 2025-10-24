@@ -913,6 +913,9 @@ export default {
       let trafficChartInstance = null;
       const showOriginalTrafficData = ref(false);
 
+      // 复制订阅时间戳（用于判断是否需要显示失效提醒）
+      let lastCopyTimestamp = 0;
+
       const platforms = [
       {id: 'ios', icon: 'IconBrandApple'},
       {id: 'android', icon: 'IconBrandAndroid'},
@@ -1462,14 +1465,27 @@ export default {
 
     const copySubscription = () => {
       if (userPlan.value.subscribeUrl) {
+        // 获取当前时间戳
+        const currentTime = Date.now();
+        // 计算距离上次复制的时间间隔（毫秒）
+        const timeSinceLastCopy = currentTime - lastCopyTimestamp;
+        // 判断是否需要显示失效提醒（超过60秒或首次复制）
+        const shouldShowWarning = timeSinceLastCopy > 60000 || lastCopyTimestamp === 0;
+
         const copyWithAPI = () => {
           navigator.clipboard.writeText(userPlan.value.subscribeUrl)
               .then(() => {
                 showToast(t('dashboard.subscriptionCopied'), 'success', 3000);
-                // 延迟200ms后显示第二个提示框，确保它出现在第一个提示框下方
-                setTimeout(() => {
-                  showToast(t('dashboard.subscriptionValidityWarning'), 'warning', 6000);
-                }, 200);
+                
+                // 更新复制时间戳
+                lastCopyTimestamp = Date.now();
+                
+                // 只有在首次复制或60秒后再次复制时才显示失效提醒
+                if (shouldShowWarning) {
+                  setTimeout(() => {
+                    showToast(t('dashboard.subscriptionValidityWarning'), 'warning', 6000);
+                  }, 200);
+                }
               })
               .catch(() => {
                 showToast(t('dashboard.copyFailed'), 'error', 3000);
@@ -1493,10 +1509,16 @@ export default {
 
             if (successful) {
               showToast(t('dashboard.subscriptionCopied'), 'success', 3000);
-              // 延迟200ms后显示第二个提示框，确保它出现在第一个提示框下方
-              setTimeout(() => {
-                showToast(t('dashboard.subscriptionValidityWarning'), 'warning', 6000);
-              }, 200);
+              
+              // 更新复制时间戳
+              lastCopyTimestamp = Date.now();
+              
+              // 只有在首次复制或60秒后再次复制时才显示失效提醒
+              if (shouldShowWarning) {
+                setTimeout(() => {
+                  showToast(t('dashboard.subscriptionValidityWarning'), 'warning', 6000);
+                }, 200);
+              }
             } else {
               showToast(t('dashboard.copyFailed'), 'error', 3000);
             }
